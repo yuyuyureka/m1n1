@@ -111,6 +111,27 @@ void smp_secondary_prep_el3(void)
     return;
 }
 
+
+static void smp_prepare_cpu(int index)
+{
+    memset(&spin_table[index], 0, sizeof(struct spin_table));
+
+    target_cpu = index;
+    secondary_stacks[index] = memalign(0x4000, SECONDARY_STACK_SIZE);
+    if (has_el3()) {
+        secondary_stacks_el3[index] = memalign(0x4000, SECONDARY_STACK_SIZE);
+        _reset_stack = secondary_stacks_el3[index] + SECONDARY_STACK_SIZE; // EL3
+        _reset_stack_el1 = secondary_stacks[index] + SECONDARY_STACK_SIZE; // EL1
+
+        dc_civac_range(&_reset_stack_el1, sizeof(void *));
+    } else
+        _reset_stack = secondary_stacks[index] + SECONDARY_STACK_SIZE;
+
+    dc_civac_range(&_reset_stack, sizeof(void *));
+
+    sysop("dsb sy");
+}
+
 static void smp_start_cpu(int index, int die, int cluster, int core, u64 impl, u64 cpu_start_base)
 {
     int i;
@@ -132,22 +153,7 @@ static void smp_start_cpu(int index, int die, int cluster, int core, u64 impl, u
 
     printf("Starting CPU %d (%d:%d:%d)... ", index, die, cluster, core);
 
-    memset(&spin_table[index], 0, sizeof(struct spin_table));
-
-    target_cpu = index;
-    secondary_stacks[index] = memalign(0x4000, SECONDARY_STACK_SIZE);
-    if (has_el3()) {
-        secondary_stacks_el3[index] = memalign(0x4000, SECONDARY_STACK_SIZE);
-        _reset_stack = secondary_stacks_el3[index] + SECONDARY_STACK_SIZE; // EL3
-        _reset_stack_el1 = secondary_stacks[index] + SECONDARY_STACK_SIZE; // EL1
-
-        dc_civac_range(&_reset_stack_el1, sizeof(void *));
-    } else
-        _reset_stack = secondary_stacks[index] + SECONDARY_STACK_SIZE;
-
-    dc_civac_range(&_reset_stack, sizeof(void *));
-
-    sysop("dsb sy");
+    smp_prepare_cpu(index);
 
     if (cpu_features->apple_sysregs_unlocked) {
         // This also clears RVBAR_LOCK, so that HV can set RVBAR later when the core is running
