@@ -10,7 +10,11 @@ p.smp_start_secondaries()
 
 tfreq = u.mrs(CNTFRQ_EL0)
 
-TEST_CPUS = [1, 4]
+TEST_CPUS = [
+        # (boot_cpu, test_cpu)
+        (4, 1),
+        (0, 5),
+]
 
 CLUSTER_PSTATE = 0x20020
 CLUSTER_STATUS = 0x20050
@@ -208,7 +212,8 @@ def bench_latency(cluster, cpu, from_pstate, to_pstate, verbose=False):
     return (tts - tval) / tfreq * 1000000000, blip / tfreq * 1000000000
 
 for cluster, creg in enumerate(CREG):
-    cpu = TEST_CPUS[cluster]
+    boot_cpu, cpu = TEST_CPUS[cluster]
+    p.smp_switch_boot_cpu(boot_cpu)
 
     freqs = []
 
