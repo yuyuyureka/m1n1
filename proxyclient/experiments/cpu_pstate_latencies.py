@@ -36,6 +36,14 @@ elif chip_id in (0x8121, 0x6020, 0x6021, 0x6022):
     else:
         MAX_PSTATE = [7, 17]
 
+elif chip_id in (0x6031, 0x6032, 0x6034):
+    CREG = [
+        0x210e00000,
+        0x211e00000,
+    ]
+
+    MAX_PSTATE = [6, 21]
+
 code = u.malloc(0x1000)
 
 hundred_microsecs = round(100/(1/(tfreq/1_000_000)))
