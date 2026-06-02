@@ -38,6 +38,8 @@ elif chip_id in (0x8121, 0x6020, 0x6021, 0x6022):
 
 code = u.malloc(0x1000)
 
+hundred_microsecs = round(100/(1/(tfreq/1_000_000)))
+
 util = asm.ARMAsm(f"""
 bench:
     mrs x1, CNTPCT_EL0
@@ -51,12 +53,14 @@ bench:
 
 signal_and_write:
     sev
+    ldr x5, ={hex(hundred_microsecs)}
     mrs x2, CNTPCT_EL0
-    add x2, x2, #0x800
+    add x2, x2, x5
 1:
     mrs x3, CNTPCT_EL0
     sub x4, x3, x2
-    cbnz x4, 1b
+    cmp x4, #0
+    blt 1b
     str x1, [x0]
     mov x0, x3
     ret
