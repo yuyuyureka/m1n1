@@ -79,21 +79,31 @@ if __name__ == "__main__":
     from m1n1.setup import *
 
     p.iodev_set_usage(IODEV.FB, 0)
+    p.smp_start_secondaries()
 
-    for reg, val in find_regs(u):
-        print(f"{sysreg_name(reg)} ({', '.join(map(str, reg))}) = 0x{val:x}")
-
-        try:
-            u.msr(reg, val, silent=True)
-        except:
-            print(" - READONLY")
-        try:
-            u.mrs(reg, silent=True, call="el1")
-        except:
-            print(" - ### EL2 only ###")
-        try:
-            u.mrs(reg, silent=True, call="el0")
-        except:
-            pass
+    for cpu in u.adt["/cpus"]:
+        if cpu.state == "running":
+            call=None
         else:
-            print(" - *** EL0 accessible ***")
+            if not p.smp_is_alive(cpu.cpu_id):
+                print(f"cpu{cpu.cpu_id} is not alive, skipping")
+                continue
+            call=lambda addr, *args: p.smp_call_sync(cpu.cpu_id, addr & ~REGION_RX_EL1, *args)
+        print(f"find_regs of cpu{cpu.cpu_id}")
+        for reg, val in find_regs(u, call=call):
+            print(f"{sysreg_name(reg)} ({', '.join(map(str, reg))}) = 0x{val:x}")
+
+        #try:
+        #    u.msr(reg, val, silent=True)
+        #except:
+        #    print(" - READONLY")
+        #try:
+        #    u.mrs(reg, silent=True, call="el1")
+        #except:
+        #    print(" - ### EL2 only ###")
+        #try:
+        #    u.mrs(reg, silent=True, call="el0")
+        #except:
+        #    pass
+        #else:
+        #    print(" - *** EL0 accessible ***")
