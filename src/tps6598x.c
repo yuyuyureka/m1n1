@@ -333,6 +333,7 @@ int tps6598x_enable_debugusb(void)
 {
     char hpm_path[64] = {0};
     char i2c_path[64] = {0};
+    char spmi_path[64] = {0};
     bool found = false;
     int node;
     int ret;
@@ -343,55 +344,91 @@ int tps6598x_enable_debugusb(void)
 
     ADT_FOREACH_CHILD(adt, node)
     {
-        int mngr_node;
-
-        if (!adt_is_compatible(adt, node, "i2c,s5l8940x"))
-            continue;
-
-        mngr_node = adt_first_child_offset(adt, node);
-        if (mngr_node < 0 || !adt_is_compatible(adt, mngr_node, "usbc,manager"))
-            continue;
-
-        int it = mngr_node;
-        ADT_FOREACH_CHILD(adt, it)
-        {
-            if (!adt_is_compatible(adt, it, "usbc,cd3217"))
+        if (adt_is_compatible(adt, node, "i2c,s5l8940x")) {
+            int mngr_node = adt_first_child_offset(adt, node);
+            if (mngr_node < 0 || !adt_is_compatible(adt, mngr_node, "usbc,manager"))
                 continue;
 
-            const char *name = adt_get_name(adt, it);
-            if (strcmp(name, "hpm0"))
-                continue;
+            int it = mngr_node;
+            ADT_FOREACH_CHILD(adt, it)
+            {
+                if (adt_is_compatible(adt, it, "usbc,cd3217"))
+                    continue;
 
-            ret = snprintf(i2c_path, sizeof(i2c_path), "/arm-io/%s", adt_get_name(adt, node));
-            if (ret < 0 || (size_t)ret >= sizeof(i2c_path))
-                continue;
-            ret = snprintf(hpm_path, sizeof(hpm_path), "/arm-io/%s/%s/%s", adt_get_name(adt, node),
-                           adt_get_name(adt, mngr_node), name);
-            if (ret < 0 || (size_t)ret >= sizeof(hpm_path))
-                continue;
+                const char *name = adt_get_name(adt, it);
+                if (strcmp(name, "hpm0"))
+                    continue;
 
-            found = true;
+                ret = snprintf(i2c_path, sizeof(i2c_path), "/arm-io/%s", adt_get_name(adt, node));
+                if (ret < 0 || (size_t)ret >= sizeof(i2c_path))
+                    continue;
+                ret = snprintf(hpm_path, sizeof(hpm_path), "/arm-io/%s/%s/%s",
+                               adt_get_name(adt, node), adt_get_name(adt, mngr_node), name);
+                if (ret < 0 || (size_t)ret >= sizeof(hpm_path))
+                    continue;
+
+                found = true;
+            }
+            if (found)
+                break;
+        } else if (adt_is_compatible(adt, node, "aapl,spmi") ||
+                   adt_is_compatible(adt, node, "spmi,gen3")) {
+            int it = node;
+            ADT_FOREACH_CHILD(adt, it)
+            {
+                if (!adt_is_compatible(adt, it, "usbc,sn201202x,spmi"))
+                    continue;
+
+                const char *name = adt_get_name(adt, it);
+                if (strcmp(name, "hpm0"))
+                    continue;
+
+                ret = snprintf(spmi_path, sizeof(spmi_path), "/arm-io/%s", adt_get_name(adt, node));
+                if (ret < 0 || (size_t)ret >= sizeof(spmi_path))
+                    continue;
+                ret = snprintf(hpm_path, sizeof(hpm_path), "/arm-io/%s/%s", adt_get_name(adt, node),
+                               name);
+                if (ret < 0 || (size_t)ret >= sizeof(hpm_path))
+                    continue;
+
+                found = true;
+            }
+            if (found)
+                break;
         }
-        if (found)
-            break;
     }
     if (!found) {
-        printf("tps6598x_enable_debugusb: i2c / hpm node not found\n");
+        printf("tps6598x_enable_debugusb: i2c / spmi hpm node not found\n");
         return -1;
     }
 
     printf("tps6598x: enable debugusb for %s\n", hpm_path);
 
-    i2c_dev_t *i2c = i2c_init(i2c_path);
-    if (!i2c) {
-        printf("tps6598x_enable_debugusb: i2c_init failed for %s.\n", i2c_path);
-        return -1;
-    }
+    tps6598x_dev_t *tps;
+    i2c_dev_t *i2c = NULL;
+    if (i2c_path[0]) {
+        i2c = i2c_init(i2c_path);
+        if (!i2c) {
+            printf("tps6598x_enable_debugusb: i2c_init failed for %s.\n", i2c_path);
+            return -1;
+        }
 
-    tps6598x_dev_t *tps = tps6598x_init_i2c(hpm_path, i2c);
-    if (!tps) {
-        printf("tps6598x_enable_debugusb: tps6598x_init failed for %s.\n", hpm_path);
-        return -1;
+        tps = tps6598x_init_i2c(hpm_path, i2c);
+        if (!tps) {
+            printf("tps6598x_enable_debugusb: tps6598x_init failed for %s.\n", hpm_path);
+            return -1;
+        }
+    } else {
+        spmi_dev_t *spmi = spmi_init(spmi_path);
+        if (!spmi) {
+            printf("tps6598x_enable_debugusb: spmi_init failed for %s.\n", spmi_path);
+        }
+
+        tps = tps6598x_init_spmi(hpm_path, spmi);
+        if (!tps) {
+            printf("tps6598x_enable_debugusb: tps6598x_init failed for %s.\n", hpm_path);
+            return -1;
+        }
     }
 
     if (tps6598x_powerup(tps) < 0) {
@@ -404,7 +441,8 @@ int tps6598x_enable_debugusb(void)
 
     tps6598x_shutdown(tps);
 
-    i2c_shutdown(i2c);
+    if (i2c)
+        i2c_shutdown(i2c);
 
     return 0;
 }
