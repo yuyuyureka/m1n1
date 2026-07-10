@@ -15,6 +15,10 @@
 
 static u64 uart_base = 0;
 
+#ifndef DOCKCHANNEL_UART_CHANNEL
+#define DOCKCHANNEL_UART_CHANNEL 1
+#endif
+
 int dockchannel_uart_init(void)
 {
     int path[8];
@@ -26,6 +30,8 @@ int dockchannel_uart_init(void)
         printf("!!! Failed to get dockchannel UART reg property!\n");
         return -1;
     }
+
+    uart_base += DOCKCHANNEL_UART_CHANNEL * 0x10000;
 
     printf("Initialized dockchannel UART at 0x%lx\n", uart_base);
 

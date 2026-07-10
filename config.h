@@ -26,6 +26,9 @@
 // Switch the DFU USB-C port to debugusb
 // #define USE_DEBUG_USB
 
+// Change the 'channel' used by the dockchannel-uart iodev (if unset: 1)
+//#define DOCKCHANNEL_UART_CHANNEL 0
+
 #ifdef RELEASE
 # define FB_SILENT_MODE
 # ifdef CHAINLOADING
