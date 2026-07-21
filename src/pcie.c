@@ -306,6 +306,10 @@ static int pcie_init_controller(int controller, const char *path)
         fuse_bits = NULL;
         state->pcie_regs = &regs_t8132;
         printf("pcie: Initializing t6040 PCIe controller\n");
+    } else if (adt_is_compatible(adt, adt_offset, "apcie,t8142")) {
+        fuse_bits = NULL;
+        state->pcie_regs = &regs_t8132;
+        printf("pcie: Initializing t8142 PCIe controller\n");
     } else if (adt_is_compatible(adt, adt_offset, "apcie-ge,t6020")) {
         u32 lane_cfg;
         fuse_bits = NULL;
