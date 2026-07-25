@@ -277,6 +277,7 @@ static const struct atc_fuse_info atc_fuses_t8112_port1[] = {
 // Order "atc-phy" compatibles in reverse chronologically order to deal with mutliple compatible
 // strings in ADT atc-phy nodes.
 static const struct atc_fuse_hw atc_fuses[] = {
+    {"atc-phy,t8132", -1, NULL, 0},
     {"atc-phy,t8122", -1, NULL, 0},
     {"atc-phy,t6020", -1, NULL, 0},
     {"atc-phy,t8112", 0, atc_fuses_t8112_port0, ARRAY_SIZE(atc_fuses_t8112_port0)},
@@ -369,6 +370,11 @@ static int dt_append_atc_tunable(void *dt, int adt_node, int fdt_node,
     const struct atc_tunable *tunable_adt =
         adt_getprop(adt, adt_node, tunable_info->adt_name, &tunables_len);
 
+    // Alias tunable_ATC0AXI2AF to tunable_ATCAXI2AF, seen on M4 Mac mini (J773g)
+    if (!tunable_adt && !strcmp(tunable_info->adt_name, "tunable_ATC0AXI2AF")) {
+        tunable_adt = adt_getprop(adt, adt_node, "tunable_ATCAXI2AF", &tunables_len);
+    }
+
     if (!tunable_adt) {
         printf("ADT: tunable %s not found\n", tunable_info->adt_name);
 
@@ -443,7 +449,8 @@ static void dt_copy_atc_tunables(void *dt, const char *adt_path, const char *dt_
         goto cleanup;
     }
 
-    if (adt_is_compatible_at(adt, adt_node, "atc-phy,t8122", 0)) {
+    if (adt_is_compatible_at(adt, adt_node, "atc-phy,t8122", 0) ||
+        adt_is_compatible_at(adt, adt_node, "atc-phy,t8132", 0)) {
         tunables = &atc_tunables_t8122[0];
         tunable_count = sizeof(atc_tunables_t8122) / sizeof(*atc_tunables_t8122);
     } else {
