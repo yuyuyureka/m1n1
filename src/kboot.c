@@ -316,6 +316,11 @@ static int dt_set_chosen(void)
     if (dt_set_rng_seed_sep(node))
         return dt_set_rng_seed_adt(node);
 
+    if (wfi_loses_state()) {
+        if (fdt_appendprop_string(dt, node, "bootargs", " idle=nop arm64.nowfxt"))
+            bail("FDT: failed to append to 'bootargs' property\n");
+    }
+
     return 0;
 }
 
