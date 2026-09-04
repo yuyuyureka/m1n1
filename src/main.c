@@ -183,6 +183,7 @@ void m1n1_main(void)
     sep_init();
 #endif
 
+    smp_start_secondaries();
     printf("Initialization complete.\n");
 
     run_actions();
